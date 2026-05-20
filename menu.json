@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Салат Цезарь",
+    "description": "Классический салат с курицей, сухариками и соусом Цезарь.",
+    "price": 350,
+    "image": "https://example.com/salad.jpg"
+  },
+  {
+    "name": "Стейк из говядины",
+    "description": "Сочный стейк средней прожарки с гарниром из овощей.",
+    "price": 1200,
+    "image": "https://example.com/steak.jpg"
+  }
+]

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>Меню MasterFood</title>
+    <style>
+        /* стили как в предыдущем примере */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #d35400;
+        }
+        .dish {
+            background: white;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+        }
+        .dish img {
+            max-width: 150px;
+            border-radius: 8px;
+            margin-right: 20px;
+        }
+        .dish-info {
+            flex: 1;
+        }
+        .dish-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .dish-description {
+            margin-bottom: 8px;
+        }
+        .dish-price {
+            color: #e67e22;
+            font-weight: bold;
+        }
+        button {
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #cf711f;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🍽 Меню MasterFood</h1>
+
+<div id="menu-container">
+    <!-- Меню подгрузится сюда -->
+</div>
+
+<script>
+async function loadMenu() {
+    const response = await fetch('menu.json');
+    const dishes = await response.json();
+
+    const container = document.getElementById('menu-container');
+
+    dishes.forEach(dish => {
+        const dishDiv = document.createElement('div');
+        dishDiv.className = 'dish';
+
+        dishDiv.innerHTML = `
+            <img src="${dish.image}" alt="${dish.name}" />
+            <div class="dish-info">
+                <div class="dish-name">${dish.name}</div>
+                <div class="dish-description">${dish.description}</div>
+                <div class="dish-price">${dish.price} ₽</div>
+                <button onclick="alert('Добавлено в корзину: ${dish.name}')">Добавить в корзину</button>
+            </div>
+        `;
+
+        container.appendChild(dishDiv);
+    });
+}
+
+loadMenu();
+</script>
+
+</body>
+</html>
