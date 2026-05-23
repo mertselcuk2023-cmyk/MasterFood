@@ -1,97 +1,133 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <title>Меню MasterFood</title>
-    <style>
-        /* стили как в предыдущем примере */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f9f9f9;
-            color: #333;
-        }
-        h1 {
-            text-align: center;
-            color: #d35400;
-        }
-        .dish {
-            background: white;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-        }
-        .dish img {
-            max-width: 150px;
-            border-radius: 8px;
-            margin-right: 20px;
-        }
-        .dish-info {
-            flex: 1;
-        }
-        .dish-name {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-        .dish-description {
-            margin-bottom: 8px;
-        }
-        .dish-price {
-            color: #e67e22;
-            font-weight: bold;
-        }
-        button {
-            background-color: #e67e22;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #cf711f;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Меню MasterFood</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .dish { display: flex; align-items: center; margin-bottom: 15px; }
+    .dish img { width: 120px; height: 120px; border-radius: 8px; margin-right: 15px; object-fit: cover; }
+    .dish-info { flex: 1; }
+    .dish-name { font-weight: bold; font-size: 18px; }
+    .dish-price { color: #e67e22; font-weight: bold; margin-top: 5px; }
+    .cart-item { margin-bottom: 10px; }
+    button { padding: 5px 10px; margin-left: 5px; border-radius: 5px; cursor: pointer; }
+    button:hover { background-color: #d35400; color: white; }
+    #checkoutBtn { margin-top: 20px; padding: 10px 20px; font-size: 16px; }
+  </style>
 </head>
 <body>
 
 <h1>🍽 Меню MasterFood</h1>
 
-<div id="menu-container">
-    <!-- Меню подгрузится сюда -->
-</div>
+<div id="menu"></div>
 
+<h2>Корзина</h2>
+<div id="cart"></div>
+
+<button id="checkoutBtn" disabled>Перейти к оформлению заказа</button>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-async function loadMenu() {
-    const response = await fetch('menu.json');
-    const dishes = await response.json();
+const menuData = [];
 
-    const container = document.getElementById('menu-container');
+let cart = {};
 
-    dishes.forEach(dish => {
-        const dishDiv = document.createElement('div');
-        dishDiv.className = 'dish';
+const menuDiv = document.getElementById('menu');
+const cartDiv = document.getElementById('cart');
+const checkoutBtn = document.getElementById('checkoutBtn');
 
-        dishDiv.innerHTML = `
-            <img src="${dish.image}" alt="${dish.name}" />
-            <div class="dish-info">
-                <div class="dish-name">${dish.name}</div>
-                <div class="dish-description">${dish.description}</div>
-                <div class="dish-price">${dish.price} ₽</div>
-                <button onclick="alert('Добавлено в корзину: ${dish.name}')">Добавить в корзину</button>
-            </div>
-        `;
+// Загружаем меню из JSON
+fetch('menu.json')
+  .then(response => response.json())
+  .then(data => {
+    menuData.push(...data);
+    renderMenu();
+  })
+  .catch(err => {
+    menuDiv.textContent = 'Ошибка загрузки меню.';
+    console.error(err);
+  });
 
-        container.appendChild(dishDiv);
-    });
+function renderMenu() {
+  menuDiv.innerHTML = '';
+  menuData.forEach(dish => {
+    const dishDiv = document.createElement('div');
+    dishDiv.className = 'dish';
+    dishDiv.innerHTML = `
+      <img src="${dish.image}" alt="${dish.name}" />
+      <div class="dish-info">
+        <div class="dish-name">${dish.name}</div>
+        <div>${dish.description}</div>
+        <div class="dish-price">${dish.price} ₽</div>
+        <button onclick="addToCart(${dish.id})">Добавить</button>
+      </div>
+    `;
+    menuDiv.appendChild(dishDiv);
+  });
 }
 
-loadMenu();
+function renderCart() {
+  cartDiv.innerHTML = '';
+  const keys = Object.keys(cart);
+  if (keys.length === 0) {
+    cartDiv.textContent = 'Корзина пуста';
+    checkoutBtn.disabled = true;
+    return;
+  }
+  checkoutBtn.disabled = false;
+  keys.forEach(id => {
+    const item = cart[id];
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'cart-item';
+    itemDiv.innerHTML = `
+      ${item.name} - ${item.quantity} шт. (${item.price * item.quantity} ₽)
+      <button onclick="changeQuantity(${id}, 1)">+</button>
+      <button onclick="changeQuantity(${id}, -1)">-</button>
+      <button onclick="removeFromCart(${id})">Удалить</button>
+    `;
+    cartDiv.appendChild(itemDiv);
+  });
+}
+
+function addToCart(id) {
+  const dish = menuData.find(d => d.id === id);
+  if (!cart[id]) {
+    cart[id] = {...dish, quantity: 1};
+  } else {
+    cart[id].quantity++;
+  }
+  renderCart();
+}
+
+function changeQuantity(id, delta) {
+  if (!cart[id]) return;
+  cart[id].quantity += delta;
+  if (cart[id].quantity <= 0) {
+    delete cart[id];
+  }
+  renderCart();
+}
+
+function removeFromCart(id) {
+  delete cart[id];
+  renderCart();
+}
+
+checkoutBtn.onclick = () => {
+  const order = Object.values(cart);
+  if (order.length === 0) {
+    alert('Корзина пуста');
+    return;
+  }
+  const orderData = {
+    order,
+    total: order.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  };
+  Telegram.WebApp.sendData(JSON.stringify(orderData));
+  alert('Данные заказа отправлены боту!');
+};
+
 </script>
 
 </body>
