@@ -1,121 +1,74 @@
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup
+    Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 )
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ConversationHandler,
-    MessageHandler, filters, ContextTypes
+    ApplicationBuilder, CommandHandler, ContextTypes,
+    CallbackQueryHandler, MessageHandler, filters
 )
 import os
+import json
 
 TOKEN = os.environ.get('TOKEN')
-ADMIN_CHAT_ID = -5254029215  # Ваш ID группы для заказов
-
-# Состояния разговора
-(
-    SELECTING_DISH,
-    CONFIRMING_QUANTITY,
-    ENTERING_ADDRESS,
-    ENTERING_TIME,
-    ENTERING_PAYMENT
-) = range(5)
-
-menu = [
-    {'name': 'Салат Цезарь', 'description': 'Классический салат с курицей', 'price': 350},
-    {'name': 'Стейк из говядины', 'description': 'Сочный стейк средней прожарки', 'price': 1200},
-]
+ADMIN_CHAT_ID = -5254029215  # замените на ваш ID группы
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Добро пожаловать! Введите /menu чтобы увидеть меню.")
-
-async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = []
-    for i, dish in enumerate(menu):
-        keyboard.append([InlineKeyboardButton(f"Заказать {dish['name']} ({dish['price']} ₽)", callback_data=str(i))])
+    keyboard = [
+        [InlineKeyboardButton("🍽 Открыть меню", web_app=WebAppInfo(url="https://mertselcuk2023-cmyk.github.io/MasterFood/menu.html"))],
+        [InlineKeyboardButton("🚚 Доставка и оплата", callback_data="Доставка и оплата")],
+        [InlineKeyboardButton("🤝 Реферальная программа", callback_data="Реферальная программа")],
+        [InlineKeyboardButton("🍲 Предложить блюдо", callback_data="Предложить блюдо")],
+        [InlineKeyboardButton("💰 Баланс", callback_data="Баланс")],
+        [InlineKeyboardButton("⚙️ Настройки", callback_data="Настройки")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Меню:", reply_markup=reply_markup)
-    return SELECTING_DISH
+    welcome_text = "👋 Добро пожаловать в MasterFood!"
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
-async def select_dish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    dish_id = int(query.data)
-    context.user_data['dish_id'] = dish_id
-    dish = menu[dish_id]
-    await query.edit_message_text(text=f"Вы выбрали: {dish['name']}. Сколько штук вы хотите заказать?")
-    return CONFIRMING_QUANTITY
+    data = query.data
+    if data == "Доставка и оплата":
+        text = "Информация о доставке и оплате."
+    elif data == "Реферальная программа":
+        text = "Информация о реферальной программе."
+    elif data == "Предложить блюдо":
+        text = "Вы можете предложить блюдо, отправив его название и описание."
+    elif data == "Баланс":
+        text = "Ваш текущий баланс: 0 ₽."
+    elif data == "Настройки":
+        text = "Настройки пока недоступны."
+    else:
+        text = "Неизвестная команда."
+    await query.edit_message_text(text=text)
 
-async def quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        qty = int(update.message.text)
-        if qty <= 0:
-            raise ValueError
-    except ValueError:
-        await update.message.reply_text("Пожалуйста, введите корректное положительное число.")
-        return CONFIRMING_QUANTITY
-    context.user_data['quantity'] = qty
-    await update.message.reply_text("Введите адрес доставки:")
-    return ENTERING_ADDRESS
+async def receive_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = update.message.web_app_data.data
+    order = json.loads(data)
 
-async def address(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['address'] = update.message.text
-    await update.message.reply_text("Введите желаемое время доставки (например, 13:30):")
-    return ENTERING_TIME
+    lines = ["Новый заказ:\n"]
+    total = 0
+    for item in order.get('order', []):
+        name = item.get('name')
+        qty = item.get('quantity')
+        price = item.get('price')
+        sum_price = price * qty
+        total += sum_price
+        lines.append(f"{name} — {qty} шт. — {price} ₽/шт — Итого: {sum_price} ₽")
 
-async def delivery_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['delivery_time'] = update.message.text
-    await update.message.reply_text("Введите способ оплаты (наличные, карта, онлайн):")
-    return ENTERING_PAYMENT
-
-async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['payment'] = update.message.text
-    dish_id = context.user_data['dish_id']
-    dish = menu[dish_id]
-    qty = context.user_data['quantity']
-    address = context.user_data['address']
-    time = context.user_data['delivery_time']
-    payment = context.user_data['payment']
     user = update.effective_user
+    lines.append(f"\nПользователь: {user.full_name} (@{user.username}), ID: {user.id}")
+    lines.append(f"\nОбщая сумма заказа: {total} ₽")
 
-    order_text = (
-        f"Новый заказ!\n"
-        f"Пользователь: {user.full_name} (@{user.username}, id: {user.id})\n"
-        f"Блюдо: {dish['name']}\n"
-        f"Количество: {qty}\n"
-        f"Адрес доставки: {address}\n"
-        f"Время доставки: {time}\n"
-        f"Оплата: {payment}\n"
-        f"Итог: {dish['price'] * qty} ₽"
-    )
+    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text="\n".join(lines))
+    await update.message.reply_text("Спасибо! Ваш заказ получен и обрабатывается.")
 
-    # Отправляем заказ в группу администраторов
-    await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=order_text)
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    # Подтверждаем пользователю
-    await update.message.reply_text("Ваш заказ принят! Спасибо!")
-
-    return ConversationHandler.END
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Заказ отменён.")
-    return ConversationHandler.END
-
-if __name__ == '__main__':
-    application = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('menu', menu_command)],
-        states={
-            SELECTING_DISH: [CallbackQueryHandler(select_dish)],
-            CONFIRMING_QUANTITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, quantity)],
-            ENTERING_ADDRESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, address)],
-            ENTERING_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, delivery_time)],
-            ENTERING_PAYMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, payment)],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)],
-    )
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(conv_handler)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, receive_order))
 
     print("Бот запущен...")
-    application.run_polling()
+    app.run_polling()
